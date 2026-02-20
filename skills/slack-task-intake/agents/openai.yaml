@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slack Task Intake"
+  short_description: "Read Slack messages and turn them into actionable tasks"
+  default_prompt: "Use $slack-task-intake to fetch recent Slack messages and produce a reviewed task intake list."

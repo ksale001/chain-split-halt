@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: #18181b;
+  background: #fafafa;
+}
+
+@keyframes breatheGlow {
+  0%,
+  100% {
+    background-color: #71717a;
+  }
+  50% {
+    background-color: #09090b;
+  }
+}
+
+.breathe-cta {
+  animation: breatheGlow 1.4s ease-in-out infinite;
+  box-shadow: none !important;
+}
