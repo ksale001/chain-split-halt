@@ -29,3 +29,73 @@ body {
   animation: breatheGlow 1.4s ease-in-out infinite;
   box-shadow: none !important;
 }
+
+@keyframes breatheHint {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 0 0 0 rgba(24, 24, 27, 0);
+    border-color: #a1a1aa;
+    background-color: #ffffff;
+  }
+  50% {
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 6px rgba(24, 24, 27, 0.12);
+    border-color: #27272a;
+    background-color: #fafafa;
+  }
+}
+
+.breathe-toggle-hint {
+  animation: breatheHint 1.35s ease-in-out infinite;
+}
+
+@keyframes breatheTogglePointer {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+}
+
+.breathe-toggle-pointer {
+  animation: breatheTogglePointer 1.2s ease-in-out infinite;
+}
+
+@keyframes breatheToggleControl {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.2);
+    transform: translateY(-1px);
+  }
+}
+
+.breathe-toggle-control {
+  animation: breatheToggleControl 1.35s ease-in-out infinite;
+}
+
+@keyframes breatheNextScenario {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.18);
+  }
+}
+
+.breathe-next-scenario {
+  animation: breatheNextScenario 1.45s ease-in-out infinite;
+}
+
+.breathe-next-pill {
+  animation: breatheNextScenario 1.45s ease-in-out infinite;
+}

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Info, RotateCcw, Shield } from "lucide-react";
+import { Info, RotateCcw } from "lucide-react";
+import obolLogoInverted from "../media/obol-logo-inverted.svg";
+import obolBgTemplate01 from "../media/obol-bg-template-01.png";
 
 function cn() {
   return Array.from(arguments).filter(Boolean).join(" ");
 }
 
-function Pill({ tone = "neutral", children }) {
+function Pill({ tone = "neutral", className, children }) {
   const tones = {
     neutral: "bg-zinc-100 text-zinc-800 border-zinc-200",
     good: "bg-emerald-50 text-emerald-900 border-emerald-200",
@@ -13,7 +15,7 @@ function Pill({ tone = "neutral", children }) {
     bad: "bg-rose-50 text-rose-900 border-rose-200",
     dark: "bg-zinc-900 text-zinc-50 border-zinc-800",
   };
-  return <span className={cn("inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium", tones[tone])}>{children}</span>;
+  return <span className={cn("inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium", tones[tone], className)}>{children}</span>;
 }
 
 function Button({ variant = "solid", size = "md", className, children, ...props }) {
@@ -192,26 +194,39 @@ function simulateSlot({
 const GUIDED_STEPS = [
   {
     key: "healthy-network",
-    scenarioName: "Healthy network",
     title: "Healthy network",
     scenarioKey: "orient",
     leaderIndex: 0,
   },
   {
     key: "single-divergent-node",
-    scenarioName: "One node on a different chain",
-    title: "One node on a different chain",
+    title: "Single node following a different fork",
     scenarioKey: "singleBug",
     leaderIndex: 0,
   },
   {
     key: "contentious-fork",
-    scenarioName: "Contentious fork",
-    title: "Contentious fork (2v2)",
+    title: "Contentious fork (2 vs 2)",
     scenarioKey: "contentious",
     leaderIndex: 0,
   },
 ];
+
+const BRAND_STYLE = {
+  pageClass: "bg-gradient-to-b from-teal-50 via-white to-emerald-50 text-zinc-900",
+  headerClass: "border-emerald-200/70 bg-white/80 backdrop-blur",
+  logo: obolLogoInverted,
+  logoClass: "h-9",
+  heroClass: "bg-white/72 border-white/70 text-zinc-900 backdrop-blur-xl",
+  rightPanelClass: "bg-white/72 border-white/70 text-zinc-900 backdrop-blur-xl",
+  bgImage: obolBgTemplate01,
+  bgImageStyle: {
+    backgroundSize: "cover",
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "center bottom",
+    opacity: 0.08,
+  },
+};
 
 function buildScenarioNodes(scenarioKey) {
   const nodes = makeDefaultNodes();
@@ -238,19 +253,21 @@ function getScenarioMeta(scenarioKey) {
 }
 
 function getScenarioSentence(scenarioKey, chainSplitHalt) {
+  const modeLabel = `Chain Split Halt ${chainSplitHalt ? "ON" : "OFF"}`;
+
   if (scenarioKey === "orient") {
-    return `We are simulating how this cluster behaves in a traditional scenario with chain_split_halt turned ${chainSplitHalt ? "ON" : "OFF"}.`;
+    return `Healthy network simulation. ${modeLabel}.`;
   }
   if (scenarioKey === "singleBug") {
-    return `We are simulating how this cluster behaves when one node follows a different chain (for example: client bug or misconfiguration) with chain_split_halt turned ${chainSplitHalt ? "ON" : "OFF"}.`;
+    return `Single-node fork mismatch simulation. ${modeLabel}.`;
   }
-  return `We are simulating how this cluster behaves during a contentious split (2 vs 2) with chain_split_halt turned ${chainSplitHalt ? "ON" : "OFF"}.`;
+  return `Contentious 2 vs 2 fork simulation. ${modeLabel}.`;
 }
 
 function deriveVerdict(sim, correctFork) {
   if (sim.outcome === "halt") {
     return {
-      label: "No attestation (safety halt)",
+      label: "Did not attest to either fork",
       tone: "warn",
       explanation: "No leader reached 3/4 threshold, so cluster intentionally did not attest.",
     };
@@ -258,14 +275,14 @@ function deriveVerdict(sim, correctFork) {
 
   if (sim.fork === correctFork) {
     return {
-      label: "Attested correct chain",
+      label: `Attested to Fork ${sim.fork}`,
       tone: "good",
       explanation: "Cluster reached consensus on the intended fork.",
     };
   }
 
   return {
-    label: "Attested wrong chain",
+    label: `Attested to Fork ${sim.fork}`,
     tone: "bad",
     explanation: "Cluster followed leader data on a non-intended fork in this scenario.",
   };
@@ -307,16 +324,23 @@ export default function ChainSplitHaltLandingPage() {
 
   const [lastRun, setLastRun] = useState(null);
   const [roundView, setRoundView] = useState(0);
+  const [toggledModeByStep, setToggledModeByStep] = useState({});
+  const [landingCursor, setLandingCursor] = useState({ x: 0, y: 0, active: false });
 
   const currentStep = GUIDED_STEPS[currentStepIndex];
+  const brandVariant = BRAND_STYLE;
+  const isMintGlow = true;
+  const rightPanelShellClass = cn(
+    "rounded-3xl border-2 p-5 shadow-sm ring-2",
+    isMintGlow ? "border-white/70 bg-white/68 ring-emerald-400/15 backdrop-blur-xl shadow-[0_18px_60px_rgba(16,185,129,0.12)]" : "border-zinc-900 bg-white ring-zinc-900/10"
+  );
+  const rightPanelTitleClass = "text-sm font-semibold tracking-tight text-zinc-900";
+  const rightPanelSubtextClass = "mt-1 text-xs text-zinc-600";
+  const correctFork = useMemo(() => getScenarioMeta(currentScenarioKey).correctFork, [currentScenarioKey]);
+  const hasToggledCurrentStepMode = Boolean(toggledModeByStep[currentStep?.key]);
 
-  function executeStep(step, mode) {
-    setCurrentScenarioKey(step.scenarioKey);
-    setNodes(buildScenarioNodes(step.scenarioKey));
-    setChainSplitHalt(mode);
-    setLeaderIndex(step.leaderIndex);
+  function buildRun(step, mode) {
     const runNodes = buildScenarioNodes(step.scenarioKey);
-
     const sim = simulateSlot({
       nodes: runNodes,
       quorum: QUORUM,
@@ -330,10 +354,28 @@ export default function ChainSplitHaltLandingPage() {
 
     const verdict = deriveVerdict(sim, getScenarioMeta(step.scenarioKey).correctFork);
     const trace = buildTrace({ ...step, mode: mode ? "on" : "off" }, sim);
-
-    setLastRun({ stepKey: step.key, sim, verdict, trace });
+    const run = { stepKey: step.key, sim, verdict, trace };
     const finalRoundIndex = sim.outcome === "attest" ? Math.max(0, sim.attempts.findIndex((a) => a.ok)) : Math.max(0, sim.attempts.length - 1);
-    setRoundView(finalRoundIndex);
+
+    return {
+      scenarioKey: step.scenarioKey,
+      runNodes,
+      leader: step.leaderIndex,
+      mode,
+      run,
+      finalRoundIndex,
+    };
+  }
+
+  function executeStep(step, mode) {
+    const next = buildRun(step, mode);
+
+    setCurrentScenarioKey(next.scenarioKey);
+    setNodes(next.runNodes);
+    setChainSplitHalt(next.mode);
+    setLeaderIndex(next.leader);
+    setLastRun(next.run);
+    setRoundView(next.finalRoundIndex);
 
     setCompletedSteps((prev) => {
       if (prev.includes(step.key)) return prev;
@@ -346,8 +388,6 @@ export default function ChainSplitHaltLandingPage() {
     executeStep(currentStep, false);
   }, [started, currentStepIndex]);
 
-  const scenarioMeta = useMemo(() => getScenarioMeta(currentScenarioKey), [currentScenarioKey]);
-
   const attemptForView = useMemo(() => {
     if (!lastRun) return null;
     return lastRun.sim.attempts[roundView] || lastRun.sim.attempts[lastRun.sim.attempts.length - 1] || null;
@@ -359,11 +399,32 @@ export default function ChainSplitHaltLandingPage() {
     return attemptForView.perNode.map((p) => ({ ...p, inQuorum: quorumSet.has(p.i) }));
   }, [attemptForView]);
   const displayedLeaderIndex = attemptForView ? attemptForView.leaderIndex : leaderIndex;
-  const reachedRound = useMemo(() => {
-    if (!lastRun || lastRun.sim.outcome !== "attest") return null;
-    const idx = lastRun.sim.attempts.findIndex((a) => a.ok);
-    return idx >= 0 ? idx + 1 : null;
-  }, [lastRun]);
+  const selectedRoundStatus = useMemo(() => {
+    if (!attemptForView) return null;
+    const roundNumber = roundView + 1;
+
+    if (attemptForView.ok) {
+      const attestedFork = attemptForView.leaderFork;
+      const attestedCorrectFork = attestedFork === correctFork;
+      const priorTimeouts = roundView;
+      if (priorTimeouts > 0) {
+        return {
+          tone: attestedCorrectFork ? "good" : "bad",
+          text: `Round ${roundNumber} reached consensus after ${priorTimeouts} earlier timeout${priorTimeouts > 1 ? "s" : ""}.`,
+        };
+      }
+      return { tone: attestedCorrectFork ? "good" : "bad", text: `Round ${roundNumber} reached consensus.` };
+    }
+
+    if (attemptForView.failure && attemptForView.failure.includes("Not enough peers participate")) {
+      return { tone: "warn", text: `Round ${roundNumber} timeout, not enough peers participated.` };
+    }
+    if (attemptForView.failure && attemptForView.failure.includes("QBFT timeout")) {
+      return { tone: "warn", text: `Round ${roundNumber} timeout, quorum was not reached before the QBFT deadline.` };
+    }
+
+    return { tone: "warn", text: `Round ${roundNumber} timed out.` };
+  }, [attemptForView, roundView, correctFork]);
 
   function startWalkthrough() {
     setStarted(true);
@@ -371,6 +432,7 @@ export default function ChainSplitHaltLandingPage() {
     setCompletedSteps([]);
     setLastRun(null);
     setRoundView(0);
+    setToggledModeByStep({});
   }
 
   function restartWalkthrough() {
@@ -378,6 +440,7 @@ export default function ChainSplitHaltLandingPage() {
   }
 
   function onToggleMode(v) {
+    setToggledModeByStep((prev) => ({ ...prev, [currentStep.key]: true }));
     executeStep(currentStep, v);
   }
 
@@ -392,34 +455,54 @@ export default function ChainSplitHaltLandingPage() {
     setCurrentStepIndex(index);
   }
 
+  function handleLandingMouseMove(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setLandingCursor({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      active: true,
+    });
+  }
+
+  function handleLandingMouseLeave() {
+    setLandingCursor((prev) => ({ ...prev, active: false }));
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-50 text-zinc-900">
-      <header className="border-b border-zinc-200/70 bg-white/80 backdrop-blur">
+    <div className={cn("relative min-h-screen overflow-hidden", brandVariant.pageClass)}>
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0" style={{ backgroundImage: `url(${brandVariant.bgImage})`, ...brandVariant.bgImageStyle }} />
+        <>
+          <div className="absolute -top-28 right-[-12%] h-[420px] w-[420px] rounded-full bg-emerald-300/30 blur-3xl" />
+          <div className="absolute bottom-[-160px] left-[-10%] h-[360px] w-[460px] rounded-full bg-teal-200/30 blur-3xl" />
+        </>
+      </div>
+
+      <header className={cn("relative z-10 border-b", brandVariant.headerClass)}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-zinc-900 text-white shadow-sm">
-              <Shield size={18} />
-            </div>
-            <div>
-              <div className="text-sm font-extrabold leading-tight">Chain Split Halt Walkthrough</div>
-            </div>
+            <img src={brandVariant.logo} alt="Obol" className={cn("w-auto", brandVariant.logoClass)} />
           </div>
-          <Pill tone="dark">Fixed cluster: 4 nodes, threshold 3/4</Pill>
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-extrabold leading-tight text-zinc-900">Chain Split Halt Walkthrough</div>
+            <Pill tone="dark">Fixed cluster: 4 nodes, threshold 3/4</Pill>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-8">
         <div className="grid gap-6 lg:grid-cols-12">
           <section className="lg:col-span-5 space-y-4">
-            <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <div className={cn("rounded-3xl border p-5 shadow-sm", brandVariant.heroClass, isMintGlow ? "shadow-[0_18px_60px_rgba(16,185,129,0.14)]" : "")}>
               <div className="text-xs font-bold text-zinc-600">Walkthrough mission</div>
-              <h1 className="mt-2 text-2xl font-extrabold tracking-tight">Lets walk through how Obols Chain Split Halt feature protects your validator in various scenarios</h1>
+              <h1 className="mt-2 text-2xl font-extrabold tracking-tight">Obol&apos;s Chain Split Halt feature protects your validator from following contentious forks</h1>
 
               <div className="mt-4 space-y-2">
                 {GUIDED_STEPS.map((step, index) => {
                   const status = getStepStatus(index);
                   const done = status === "done";
                   const now = status === "now";
+                  const isNextStep = started && index === currentStepIndex + 1;
                   const stepsAhead = index - currentStepIndex;
                   let blurClass = "";
                   let opacityClass = "";
@@ -444,6 +527,7 @@ export default function ChainSplitHaltLandingPage() {
                       key={step.key}
                       className={cn(
                         "w-full rounded-xl border px-3 py-2 text-left text-xs transition",
+                        isNextStep ? "breathe-next-scenario" : "",
                         now ? "border-zinc-900 bg-zinc-50" : done ? "border-emerald-200 bg-emerald-50" : "border-zinc-200 bg-white"
                       )}
                     >
@@ -456,10 +540,11 @@ export default function ChainSplitHaltLandingPage() {
                             Start
                           </Pill>
                         ) : (
-                          <Pill tone={now ? "dark" : done ? "good" : "neutral"}>{now ? "Now" : done ? "Done" : "View"}</Pill>
+                          <Pill tone={now ? "dark" : done ? "good" : isNextStep ? "warn" : "neutral"} className={isNextStep ? "breathe-next-pill" : ""}>
+                            {now ? "Now" : done ? "Done" : isNextStep ? "Next" : "View"}
+                          </Pill>
                         )}
                       </div>
-                      <div className={cn("mt-1 text-zinc-600", blurClass, opacityClass)}>{step.scenarioName}</div>
                     </button>
                   );
                 })}
@@ -479,8 +564,20 @@ export default function ChainSplitHaltLandingPage() {
 
           <section className="relative lg:col-span-7 space-y-4">
             {!started ? (
-              <div className="absolute inset-0 z-20 rounded-3xl border border-zinc-200 bg-white/70 backdrop-blur-xl">
-                <div className="flex h-full items-center justify-center px-6 text-center">
+              <div
+                className="absolute inset-0 z-20 overflow-hidden rounded-3xl border border-zinc-200 bg-white/70 backdrop-blur-xl"
+                onMouseMove={handleLandingMouseMove}
+                onMouseLeave={handleLandingMouseLeave}
+              >
+                {landingCursor.active ? (
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background: `radial-gradient(180px circle at ${landingCursor.x}px ${landingCursor.y}px, rgba(0,0,0,0.28), rgba(0,0,0,0) 70%)`,
+                    }}
+                  />
+                ) : null}
+                <div className="relative z-10 flex h-full items-center justify-center px-6 text-center">
                   <div className="max-w-sm">
                     <div className="text-sm font-bold text-zinc-900">Start on the left</div>
                     <div className="mt-1 text-xs text-zinc-700">
@@ -492,27 +589,34 @@ export default function ChainSplitHaltLandingPage() {
             ) : null}
 
             {started ? (
-              <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <div className={cn("rounded-3xl border p-5 shadow-sm", brandVariant.rightPanelClass, isMintGlow ? "shadow-[0_18px_60px_rgba(16,185,129,0.14)]" : "")}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex flex-nowrap items-center gap-2">
                     <Pill tone="neutral">Scenario {currentStepIndex + 1} of {GUIDED_STEPS.length}</Pill>
                   </div>
-                  <div
-                    className={cn(
-                      "w-64 min-h-[52px] rounded-xl border px-3 py-1.5 text-xs",
-                      chainSplitHalt ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-zinc-200 bg-zinc-50 text-zinc-700"
-                    )}
-                  >
+                  <div className="relative">
+                    {!hasToggledCurrentStepMode ? (
+                      <div className="pointer-events-none absolute right-full top-1/2 z-10 mr-2 hidden -translate-y-1/2 text-right sm:block">
+                        <div className="breathe-toggle-pointer text-2xl leading-none text-zinc-900">→</div>
+                        <div className="mt-1 w-36 text-[11px] font-semibold leading-snug text-zinc-700">Toggle to see how behavior changes</div>
+                      </div>
+                    ) : null}
+                    <div
+                      className={cn(
+                        "w-64 min-h-[52px] rounded-xl border px-3 py-1.5 text-xs",
+                        chainSplitHalt ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-zinc-200 bg-zinc-50 text-zinc-700"
+                      )}
+                    >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] font-semibold text-zinc-900">Chain Split Halt</div>
-                      <div className="flex items-center gap-1 text-[10px] font-semibold">
+                      <div className="text-xs font-semibold text-zinc-900">Chain Split Halt</div>
+                      <div className="flex items-center gap-1 text-xs font-semibold">
                         <span className={cn(!chainSplitHalt ? "text-zinc-900" : "text-zinc-400")}>OFF</span>
                         <button
                           type="button"
                           onClick={() => onToggleMode(!chainSplitHalt)}
                           aria-pressed={chainSplitHalt}
                           className={cn(
-                            "relative inline-flex h-6 w-11 items-center rounded-full border transition",
+                            "breathe-toggle-control relative inline-flex h-6 w-11 items-center rounded-full border transition",
                             chainSplitHalt ? "border-emerald-500 bg-emerald-500" : "border-zinc-300 bg-zinc-200"
                           )}
                         >
@@ -533,7 +637,7 @@ export default function ChainSplitHaltLandingPage() {
                         >
                           <Info size={12} />
                         </button>
-                        <div className="pointer-events-none absolute right-0 top-7 z-30 hidden w-56 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-[11px] leading-snug text-zinc-700 shadow group-hover:block">
+                        <div className="pointer-events-none absolute right-0 top-7 z-30 hidden w-56 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-xs leading-snug text-zinc-700 shadow group-hover:block">
                           {chainSplitHalt
                             ? "Peers compare source and target votes with local BN data. If the data doesn't match they do not participate."
                             : "Peers participate once they receive leader attester data and do not wait for local BN data in that round."}
@@ -541,53 +645,77 @@ export default function ChainSplitHaltLandingPage() {
                       </div>
                     </div>
                   </div>
+                  </div>
                 </div>
 
-                <div className="mt-3 rounded-xl bg-zinc-50 px-3 py-2 text-sm font-semibold text-zinc-800">
+                <div className={cn("mt-3 rounded-xl px-3 py-2 text-sm font-semibold text-zinc-800", isMintGlow ? "border border-white/60 bg-white/55 backdrop-blur-md" : "bg-zinc-50")}>
                   {getScenarioSentence(currentScenarioKey, chainSplitHalt)}
                 </div>
               </div>
             ) : null}
-            <div className="rounded-3xl border-2 border-zinc-900 bg-white p-5 shadow-sm ring-2 ring-zinc-900/10">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-bold text-zinc-900">Validator outcome</div>
-                </div>
-                {lastRun ? <Pill tone={lastRun.verdict.tone}>{lastRun.verdict.label}</Pill> : <Pill tone="neutral">Start walkthrough</Pill>}
-              </div>
+            <div className={rightPanelShellClass}>
+              <div className={rightPanelTitleClass}>Validator outcome</div>
 
               {lastRun ? (
                 <div className="mt-3 grid gap-3">
-                  <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800">{lastRun.verdict.explanation}</div>
+                  <div
+                    className={cn(
+                      "rounded-2xl border px-4 py-4 text-center text-2xl font-extrabold tracking-tight",
+                      lastRun.verdict.tone === "good"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                        : lastRun.verdict.tone === "bad"
+                          ? "border-rose-300 bg-rose-50 text-rose-900"
+                          : "border-amber-300 bg-amber-50 text-amber-900"
+                    )}
+                  >
+                    {lastRun.verdict.label}
+                  </div>
+                  <div className={cn("rounded-2xl border px-3 py-2 text-sm text-zinc-700", isMintGlow ? "border-white/65 bg-white/55 backdrop-blur-md" : "border-zinc-200 bg-zinc-50")}>{lastRun.verdict.explanation}</div>
                 </div>
               ) : (
                 <div className="mt-3 text-sm text-zinc-600">Start the walkthrough to compute and display the scenario result.</div>
               )}
             </div>
 
-            <div className="rounded-3xl border-2 border-zinc-900 bg-white p-5 shadow-sm ring-2 ring-zinc-900/10">
+            <div className={rightPanelShellClass}>
               <div>
-                <div className="text-sm font-bold text-zinc-900">Node details</div>
-                <div className="mt-1 text-xs text-zinc-600">Which nodes participate in each round</div>
+                <div className={rightPanelTitleClass}>Cluster behavior</div>
+                <div className={rightPanelSubtextClass}>Which nodes participate in each round</div>
               </div>
 
               {lastRun ? (
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="inline-flex rounded-lg border border-zinc-200 bg-white p-1 text-xs">
+                  <div className={cn("inline-flex rounded-xl p-1 text-xs", isMintGlow ? "border border-white/70 bg-white/70 backdrop-blur-md" : "border border-zinc-200 bg-white")}>
                     {lastRun.sim.attempts.map((_, idx) => (
                       <button
                         key={`round-${idx}`}
                         type="button"
                         onClick={() => setRoundView(idx)}
-                        className={cn("rounded-md px-2 py-1 font-semibold transition", roundView === idx ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100")}
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 text-xs font-semibold transition",
+                          roundView === idx
+                            ? "bg-zinc-900 text-white"
+                            : isMintGlow
+                              ? "text-zinc-700 hover:bg-emerald-100/70"
+                              : "text-zinc-700 hover:bg-zinc-100"
+                        )}
                       >
                         R{idx + 1}
                       </button>
                     ))}
                   </div>
-                  {reachedRound && reachedRound > 1 ? (
-                    <div className="rounded-lg border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-900">
-                      Consensus was reached in Round {reachedRound} after Round 1 timeout.
+                  {selectedRoundStatus ? (
+                    <div
+                      className={cn(
+                        "rounded-xl px-2.5 py-1 text-xs font-semibold",
+                        selectedRoundStatus.tone === "good"
+                          ? "border border-emerald-300 bg-emerald-100 text-emerald-900"
+                          : selectedRoundStatus.tone === "bad"
+                            ? "border border-rose-300 bg-rose-50 text-rose-900"
+                            : "border border-amber-300 bg-amber-50 text-amber-900"
+                      )}
+                    >
+                      {selectedRoundStatus.text}
                     </div>
                   ) : null}
                 </div>
@@ -602,14 +730,20 @@ export default function ChainSplitHaltLandingPage() {
                     <div
                       key={node.id}
                       className={cn(
-                        "rounded-2xl border p-3",
-                        onForkB ? "border-rose-300 bg-rose-50/70 shadow-[0_0_18px_rgba(244,63,94,0.2)]" : isLeader ? "border-zinc-900" : "border-zinc-200"
+                        "rounded-2xl border-2 p-3",
+                        onForkB
+                          ? "border-rose-400 bg-rose-50/70 shadow-[0_0_0_1px_rgba(251,113,133,0.35),0_0_18px_rgba(244,63,94,0.18)]"
+                          : isLeader
+                            ? "border-zinc-900 bg-white/70 shadow-[0_0_0_1px_rgba(24,24,27,0.22)]"
+                            : isMintGlow
+                              ? "border-emerald-200/80 bg-white/60 shadow-[0_0_0_1px_rgba(52,211,153,0.18)] backdrop-blur-sm"
+                              : "border-zinc-200 bg-white"
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-bold text-zinc-900">Node {i + 1}</div>
+                        <div className="text-sm font-semibold text-zinc-900">Node {i + 1}</div>
                         <div className="flex items-center gap-1">
-                          {isLeader ? <Pill tone={onForkB ? "bad" : "dark"}>Leader</Pill> : <Pill tone="neutral">Peer</Pill>}
+                          {isLeader ? <Pill tone="dark">Leader</Pill> : <Pill tone="neutral">Peer</Pill>}
                           <Pill tone={onForkB ? "bad" : "good"}>Fork {node.fork}</Pill>
                         </div>
                       </div>
@@ -626,8 +760,8 @@ export default function ChainSplitHaltLandingPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border-2 border-zinc-900 bg-white p-5 shadow-sm ring-2 ring-zinc-900/10">
-              <div className="flex items-center gap-2 text-sm font-bold text-zinc-900">
+            <div className={rightPanelShellClass}>
+              <div className={cn("flex items-center gap-2", rightPanelTitleClass)}>
                 <RotateCcw size={14} />
                 Slot trace
               </div>
