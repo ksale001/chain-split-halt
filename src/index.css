@@ -99,3 +99,7 @@ body {
 .breathe-next-pill {
   animation: breatheNextScenario 1.45s ease-in-out infinite;
 }
+
+.breathe-round-tab {
+  animation: breatheToggleControl 1.45s ease-in-out infinite;
+}

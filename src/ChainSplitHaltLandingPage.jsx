@@ -269,7 +269,7 @@ function deriveVerdict(sim, correctFork) {
     return {
       label: "Did not attest to either fork",
       tone: "warn",
-      explanation: "No leader reached 3/4 threshold, so cluster intentionally did not attest.",
+      explanation: "Cluster did not complete QBFT with threshold, so no attestation was produced.",
     };
   }
 
@@ -277,14 +277,14 @@ function deriveVerdict(sim, correctFork) {
     return {
       label: `Attested to Fork ${sim.fork}`,
       tone: "good",
-      explanation: "Cluster reached consensus on the intended fork.",
+      explanation: `Cluster completed QBFT and attested to the canonical chain (Fork ${sim.fork}).`,
     };
   }
 
   return {
     label: `Attested to Fork ${sim.fork}`,
     tone: "bad",
-    explanation: "Cluster followed leader data on a non-intended fork in this scenario.",
+    explanation: `Cluster completed QBFT and attested to a non-canonical chain (Fork ${sim.fork}).`,
   };
 }
 
@@ -693,6 +693,7 @@ export default function ChainSplitHaltLandingPage() {
                         onClick={() => setRoundView(idx)}
                         className={cn(
                           "rounded-lg px-2.5 py-1 text-xs font-semibold transition",
+                          lastRun.sim.attempts.length > 1 ? "breathe-round-tab" : "",
                           roundView === idx
                             ? "bg-zinc-900 text-white"
                             : isMintGlow
