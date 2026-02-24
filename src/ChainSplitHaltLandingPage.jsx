@@ -259,7 +259,7 @@ function getScenarioSentence(scenarioKey, chainSplitHalt) {
     return `Healthy network simulation. ${modeLabel}.`;
   }
   if (scenarioKey === "singleBug") {
-    return `Single-node fork mismatch simulation. ${modeLabel}.`;
+    return `Simulation of a single node following a different fork. ${modeLabel}.`;
   }
   return `Contentious 2 vs 2 fork simulation. ${modeLabel}.`;
 }
